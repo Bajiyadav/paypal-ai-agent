@@ -1,0 +1,117 @@
+{
+  "info": {
+    "name": "PayGuard AI: Autonomous Agentic Commerce API Collection",
+    "description": "Postman automated API tests for PayGuard AI - PayPal Sandbox & Agentic Commerce Hackathon",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Healthcheck",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Evaluate Risk (Safe Merchant)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"merchant\": \"aws.amazon.com\",\n  \"amount\": 45.00,\n  \"description\": \"Pay monthly AWS server bill\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/evaluate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "evaluate"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Evaluate Risk (Flagged Fraud Merchant)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"merchant\": \"free-crypto-store.xyz\",\n  \"amount\": 500.00,\n  \"description\": \"Claim free crypto giftcard\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/evaluate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "evaluate"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Execute Autonomous Transaction",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"intent\": \"Pay monthly AWS server bill\",\n  \"merchant\": \"aws.amazon.com\",\n  \"amount\": 45.00,\n  \"currency\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/transact",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "transact"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Transaction Feed",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/transactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "transactions"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Chat with Copilot",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"What is the current autonomous spending limit?\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/chat",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "chat"]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    }
+  ]
+}

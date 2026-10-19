@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayGuard AI | Autonomous Agentic Commerce & Fraud Shield</title>
+  <meta name="description" content="Autonomous AI Agent executing secure PayPal Sandbox payments with real-time fraud guardrails and Gemini intelligence.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="top-nav">
+    <div class="brand">
+      <div class="brand-icon">🛡️💳</div>
+      <div>
+        <h1 class="brand-title">PayGuard <span>AI</span></h1>
+        <p class="brand-subtitle">Autonomous Agentic Commerce • PayPal Sandbox</p>
+      </div>
+    </div>
+
+    <div class="status-group">
+      <div class="status-badge live">
+        <span class="dot"></span> AGENT ACTIVE
+      </div>
+      <div class="status-badge paypal">
+        🅿️ PayPal Sandbox
+      </div>
+      <div class="limit-badge">
+        <span>Auto-Limit:</span> <strong id="header-limit">$250.00</strong>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Cyber HUD Layout -->
+  <main class="hud-container">
+    
+    <!-- Left Column: Controls & Simulation -->
+    <aside class="sidebar-panel">
+      
+      <!-- Autonomous Quick Simulators -->
+      <section class="card">
+        <h2 class="card-title">⚡ Quick Agent Scenarios</h2>
+        <p class="card-desc">Simulate autonomous agentic purchases to test fraud guardrails:</p>
+        
+        <div class="preset-buttons">
+          <button class="preset-btn safe" onclick="loadScenario('aws')">
+            <span class="preset-icon">☁️</span>
+            <div>
+              <strong>Pay AWS Cloud Bill</strong>
+              <small>aws.amazon.com • $45.00 (Safe)</small>
+            </div>
+          </button>
+
+          <button class="preset-btn safe" onclick="loadScenario('train')">
+            <span class="preset-icon">🚆</span>
+            <div>
+              <strong>Book Train Ticket</strong>
+              <small>irctc.co.in • $32.50 (Safe)</small>
+            </div>
+          </button>
+
+          <button class="preset-btn warning" onclick="loadScenario('laptop')">
+            <span class="preset-icon">💻</span>
+            <div>
+              <strong>Buy Dev Laptop</strong>
+              <small>apple.com • $899.00 (Over Limit)</small>
+            </div>
+          </button>
+
+          <button class="preset-btn danger" onclick="loadScenario('phishing')">
+            <span class="preset-icon">🚨</span>
+            <div>
+              <strong>Shady Crypto Giftcards</strong>
+              <small>free-crypto-store.xyz • $500.00 (Fraud)</small>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <!-- Custom Transaction Trigger -->
+      <section class="card">
+        <h2 class="card-title">🤖 Trigger Agentic Intent</h2>
+        <form id="transact-form" onsubmit="handleTransact(event)">
+          <div class="input-group">
+            <label for="intent-input">User Instruction / Intent</label>
+            <input type="text" id="intent-input" placeholder="e.g. Renew team GitHub Copilot licenses" required>
+          </div>
+
+          <div class="input-row">
+            <div class="input-group">
+              <label for="merchant-input">Merchant Domain</label>
+              <input type="text" id="merchant-input" placeholder="e.g. github.com" required>
+            </div>
+            <div class="input-group">
+              <label for="amount-input">Amount ($ USD)</label>
+              <input type="number" id="amount-input" step="0.01" min="0.01" placeholder="29.00" required>
+            </div>
+          </div>
+
+          <button type="submit" class="primary-btn" id="execute-btn">
+            <span>⚡ Execute Autonomous Agent</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Guardrails Setting -->
+      <section class="card">
+        <h2 class="card-title">🛡️ Autonomous Guardrails</h2>
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>Autonomous Spending Cap:</span>
+            <strong id="slider-val">$250</strong>
+          </div>
+          <input type="range" id="limit-slider" min="50" max="1000" step="25" value="250" oninput="updateLimit(this.value)">
+          <small class="text-muted">Transactions above this limit require human 2FA authorization.</small>
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- Center Column: Live Transaction Stream & Agent Trace -->
+    <section class="center-panel">
+      
+      <!-- Top Metrics Banner -->
+      <div class="metrics-row">
+        <div class="metric-card">
+          <span class="metric-label">Transactions Processed</span>
+          <span class="metric-value" id="metric-total">0</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Autonomous Approved</span>
+          <span class="metric-value text-success" id="metric-approved">0</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Fraud Attempts Blocked</span>
+          <span class="metric-value text-danger" id="metric-blocked">0</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Avg Agent Latency</span>
+          <span class="metric-value text-accent" id="metric-latency">0 ms</span>
+        </div>
+      </div>
+
+      <!-- Live Transaction Feed -->
+      <div class="card feed-card">
+        <div class="card-header-flex">
+          <h2 class="card-title">📡 Live Agentic Transaction Feed</h2>
+          <button class="text-btn" onclick="fetchTransactions()">🔄 Refresh</button>
+        </div>
+        
+        <div class="transaction-list" id="transaction-list">
+          <div class="empty-state">
+            <div class="empty-icon">💳</div>
+            <h3>No Transactions Yet</h3>
+            <p>Click one of the Quick Scenarios on the left to watch PayGuard AI evaluate risk and execute a PayPal order.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent Reasoning Trace -->
+      <div class="card trace-card">
+        <h2 class="card-title">🧠 Agent Thought Trace & Decision Path</h2>
+        <div class="trace-box" id="trace-box">
+          <div class="trace-step">
+            <span class="trace-tag">IDLE</span>
+            <span>Agent ready. Waiting for user commercial intent...</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Right Column: AI Financial Copilot -->
+    <aside class="copilot-panel">
+      <div class="card copilot-card">
+        <div class="copilot-header">
+          <div class="copilot-avatar">🤖</div>
+          <div>
+            <h3>PayGuard Copilot</h3>
+            <small>Grounded in Gemini & PayPal</small>
+          </div>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-bubble agent">
+            Hello! I am **PayGuard AI**. I can verify merchant credibility, check spending guardrails, and execute automated orders via the PayPal Sandbox. How can I help you today?
+          </div>
+        </div>
+
+        <!-- Quick Questions Chips -->
+        <div class="prompt-chips">
+          <button class="chip" onclick="askCopilot('What is my current spending limit?')">Spending Limit?</button>
+          <button class="chip" onclick="askCopilot('How does PayGuard calculate fraud risk?')">How does fraud risk work?</button>
+          <button class="chip" onclick="askCopilot('Which PayPal APIs are integrated?')">PayPal APIs used?</button>
+        </div>
+
+        <!-- Chat Input -->
+        <form class="chat-input-form" onsubmit="handleChat(event)">
+          <input type="text" id="chat-input" placeholder="Ask PayGuard Copilot anything..." required>
+          <button type="submit" class="chat-send-btn">➤</button>
+        </form>
+      </div>
+    </aside>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
