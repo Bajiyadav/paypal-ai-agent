@@ -90,14 +90,15 @@ When risk or spending limits require human intervention, PayGuard issues a state
 ## 🧪 Comprehensive Dual-Stack Test Suite (100% Passing in CI/CD)
 
 PayGuard tests both the Python FastAPI backend and the deployed Node.js serverless functions against identical adversarial test vectors in GitHub Actions:
-* **Python Backend Tests (`pytest tests/ -v`):** 19 unit, adversarial, and HITL lifecycle tests.
-* **Node.js Serverless Tests (`node tests/test_serverless.js`):** Validates the exact production code deployed to Vercel.
+* **Python Backend Tests (`pytest tests/ -v`):** 21 unit, adversarial, and HITL lifecycle tests.
+* **Node.js Serverless Tests (`node tests/test_serverless.js`):** 8 edge tests validating the exact production code deployed to Vercel.
 * **Longest-Prefix Merchant Specificity:** Validates `aws.amazon.com` matches Cloud Infrastructure (99/100), not Retail.
-* **Spoofed Subdomain Defense:** Confirms `amazon.com.evil.xyz` and `amazon.com.evil.com` cannot achieve autonomous approval.
+* **Spoofed Subdomain & User-Info Defense:** Confirms `amazon.com.evil.xyz`, `amazon.com.evil.com`, `amazon.com@evil.com`, and `amazon.com.evil.com:8443` cannot achieve autonomous approval.
 * **Prompt-Injection Defense:** Confirms adversarial override attempts are intercepted.
 * **Typosquatting Detection:** Catches `paypa1.com` homograph attacks.
 * **Amount Validation:** Rejects negative, zero, or non-finite values.
-* **Stateless HMAC 2FA Lifecycle:** Validates challenge issuance, parameter binding, replay defense, rejection, and approval.
+* **Stateless HMAC 2FA Lifecycle & One-Time Replay Defense:** Validates challenge issuance, parameter binding, rejection, approval, and 409 rejection of replayed consumed tokens.
+
 
 ---
 

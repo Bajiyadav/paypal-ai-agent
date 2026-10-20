@@ -466,6 +466,13 @@ class PayGuardAgent:
         if not challenge:
             return {"status": "error", "message": "Invalid or expired challenge ID"}
 
+        if challenge.get("status") in ["REJECTED_BY_USER", "APPROVED_AND_EXECUTED"]:
+            return {
+                "status": "error",
+                "error": "REPLAY_ATTACK_PREVENTED",
+                "message": f"Challenge '{challenge_id}' has already been consumed and cannot be reused."
+            }
+
         if not approved:
             challenge["status"] = "REJECTED_BY_USER"
             return {

@@ -47,6 +47,28 @@ class TestRiskAndAdversarialEngine:
         assert eval_res["breakdown"]["merchant_reputation"] == 30
         assert eval_res["breakdown"]["tld_reputation"] == 35
 
+    def test_user_info_spoofing_prevented(self):
+        """Attacker crafts user-info URL 'amazon.com@evil.com' to bypass naive substring checks."""
+        eval_res = self.agent.evaluate_risk(
+            merchant="amazon.com@evil.com",
+            amount=45.00,
+            description="Phishing invoice with embedded user-info credential"
+        )
+        assert eval_res["decision"] != "AUTONOMOUS_APPROVED"
+        assert eval_res["host"] == "evil.com"
+        assert eval_res["breakdown"]["merchant_reputation"] == 30
+
+    def test_deceptive_port_spoofing_prevented(self):
+        """Attacker appends port to subdomain 'amazon.com.evil.com:8443' to evade exact domain checks."""
+        eval_res = self.agent.evaluate_risk(
+            merchant="amazon.com.evil.com:8443",
+            amount=45.00,
+            description="Port-spoofed phishing link"
+        )
+        assert eval_res["decision"] != "AUTONOMOUS_APPROVED"
+        assert eval_res["host"] == "amazon.com.evil.com"
+        assert eval_res["breakdown"]["merchant_reputation"] == 30
+
     def test_empty_merchant_not_verified(self):
         """Empty or malformed merchant string must never match verified whitelist."""
         eval_res = self.agent.evaluate_risk(
@@ -189,6 +211,17 @@ class TestFastAPIEndpointsAndHITL:
         assert appr_data["status"] == "approved"
         assert "order" in appr_data
         assert appr_data["order"]["status"] == "CREATED"
+
+        # Replay Defense Test: Submitting the same challenge a second time must be rejected
+        replay_res = client.post("/api/challenge/action", json={
+            "challenge_id": challenge_id,
+            "approved": True
+        })
+        assert replay_res.status_code == 200
+        replay_data = replay_res.json()
+        assert replay_data["status"] == "error"
+        assert replay_data["error"] == "REPLAY_ATTACK_PREVENTED"
+        assert "already been consumed" in replay_data["message"]
 
     def test_transact_hitl_challenge_rejection_flow(self):
         """Verify user rejection cancels transaction without moving funds."""

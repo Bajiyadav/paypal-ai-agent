@@ -239,8 +239,15 @@ async function fetchTransactions() {
       card.className = `tx-card ${statusClass}`;
       
       let orderLinkHtml = "";
-      if (tx.order && tx.order.approval_url) {
-        orderLinkHtml = `<a href="${tx.order.approval_url}" target="_blank" class="paypal-link">🅿️ PayPal Order ${tx.order.id} ↗</a>`;
+      if (tx.order && tx.order.id) {
+        orderLinkHtml = `
+          <div class="order-actions-row" style="margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            ${tx.order.approval_url ? `<a href="${tx.order.approval_url}" target="_blank" class="paypal-link">🅿️ PayPal Order ${tx.order.id} ↗</a>` : `<span class="paypal-link">🅿️ Order: ${tx.order.id}</span>`}
+            <button class="btn-capture" id="cap-btn-${tx.order.id}" onclick="captureOrder('${tx.order.id}', this)" style="background: rgba(0, 212, 255, 0.15); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+              💰 Capture Order
+            </button>
+          </div>
+        `;
       }
 
       // Render Explainable Risk Breakdown Pills
@@ -358,6 +365,33 @@ function formatMarkdown(text) {
 function escapeHtml(str) {
   if (!str) return "";
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+async function captureOrder(orderId, btnEl) {
+  if (!btnEl) return;
+  btnEl.disabled = true;
+  btnEl.innerText = "⏳ Capturing...";
+
+  try {
+    const res = await fetch(`${API_BASE}/api/capture`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: orderId })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "COMPLETED") {
+      btnEl.style.background = "rgba(46, 213, 115, 0.25)";
+      btnEl.style.borderColor = "var(--success)";
+      btnEl.style.color = "var(--success)";
+      btnEl.innerText = `✅ Captured (${data.capture_id || "COMPLETED"})`;
+    } else {
+      btnEl.innerText = "Capture Failed";
+      btnEl.disabled = false;
+    }
+  } catch (e) {
+    btnEl.innerText = "Capture Error";
+    btnEl.disabled = false;
+  }
 }
 
 // Initial Load

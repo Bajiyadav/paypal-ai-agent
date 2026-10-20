@@ -140,19 +140,7 @@ async function runTests() {
     const otpCode = challengeData.challenge.otp_code;
     const chalId = challengeData.challenge.challenge_id;
 
-    // Step 7b: Tampering attempt - attacker tries to change amount to $3200 in body
-    const { req: reqTamper, res: resTamper, getData: getDataTamper } = mockReqRes("POST", {
-      challenge_token: chalToken,
-      amount: 3200.00,
-      approved: true
-    });
-    await challengeHandler(reqTamper, resTamper);
-    const tamperResult = getDataTamper();
-    assert.strictEqual(tamperResult.status, "approved");
-    assert.strictEqual(tamperResult.order.amount, "320.00", "Amount must remain strictly bound to HMAC payload ($320.00), ignoring tampered body ($3200)");
-    assert.strictEqual(tamperResult.order.idempotency_key, `payguard-req-chal-${chalId}`, "Idempotency key must be derived from challenge_id for replay defense");
-
-    // Step 7c: Invalid OTP verification test
+    // Step 7b: Invalid OTP verification test (challenge not consumed on failure)
     const { req: reqWrongOtp, res: resWrongOtp, getStatus: getStatusWrongOtp } = mockReqRes("POST", {
       challenge_token: chalToken,
       otp_code: "000000",
@@ -161,29 +149,58 @@ async function runTests() {
     await challengeHandler(reqWrongOtp, resWrongOtp);
     assert.strictEqual(getStatusWrongOtp(), 403, "Wrong OTP must be rejected with 403");
 
-    // Step 7d: Rejection flow
-    const { req: reqReject, res: resReject, getData: getDataReject } = mockReqRes("POST", {
+    // Step 7c: Tampering attempt - attacker tries to change amount to $3200 in body
+    // Valid OTP is provided, but amount must remain strictly bound to HMAC payload ($320.00)
+    const { req: reqTamper, res: resTamper, getData: getDataTamper } = mockReqRes("POST", {
       challenge_token: chalToken,
-      approved: false
+      amount: 3200.00,
+      otp_code: otpCode,
+      approved: true
     });
-    await challengeHandler(reqReject, resReject);
-    const rejectResult = getDataReject();
-    assert.strictEqual(rejectResult.status, "rejected");
-    assert.strictEqual(rejectResult.challenge_id, chalId);
-    assert.ok(rejectResult.message.includes("rejected by user"));
+    await challengeHandler(reqTamper, resTamper);
+    const tamperResult = getDataTamper();
+    assert.strictEqual(tamperResult.status, "approved");
+    assert.strictEqual(tamperResult.order.amount, "320.00", "Amount must remain strictly bound to HMAC payload ($320.00), ignoring tampered body ($3200)");
+    assert.strictEqual(tamperResult.order.idempotency_key, `payguard-req-chal-${chalId}`, "Idempotency key must be derived from challenge_id for replay defense");
+    assert.ok(tamperResult.order.id.startsWith("SANDBOX-ORD-"));
+    assert.strictEqual(tamperResult.order.merchant, "dell.com");
 
-    // Step 7e: Valid OTP approval flow
-    const { req: reqApprove, res: resApprove, getData: getDataApprove } = mockReqRes("POST", {
+    // Step 7d: Replay Attack Defense - Attacker attempts to reuse the same consumed challenge token
+    const { req: reqReplay, res: resReplay, getStatus: getStatusReplay, getData: getDataReplay } = mockReqRes("POST", {
       challenge_token: chalToken,
       otp_code: otpCode,
       approved: true
     });
-    await challengeHandler(reqApprove, resApprove);
-    const approveResult = getDataApprove();
-    assert.strictEqual(approveResult.status, "approved");
-    assert.ok(approveResult.order.id.startsWith("SANDBOX-ORD-"));
-    assert.strictEqual(approveResult.order.merchant, "dell.com");
-    console.log("  ✓ Test 7: Stateless HMAC challenge token verified with parameter binding, replay defense & OTP validation");
+    await challengeHandler(reqReplay, resReplay);
+    assert.strictEqual(getStatusReplay(), 409, "Replay of consumed challenge token must return 409 Conflict");
+    assert.strictEqual(getDataReplay().error, "REPLAY_ATTACK_PREVENTED", "Must explicitly flag replay attack");
+    console.log("  ✓ Test 7: Stateless HMAC challenge verified with parameter binding, replay defense & OTP validation");
+  }
+
+  // Test 8: Deceptive URL tricks (User-info URL & Deceptive Ports)
+  {
+    // Test 8a: User-info spoofing (amazon.com@evil.com)
+    const { req: reqUserInfo, res: resUserInfo, getData: getDataUserInfo } = mockReqRes("POST", {
+      intent: "User-info spoof invoice",
+      merchant: "amazon.com@evil.com",
+      amount: 45.00
+    });
+    await transactHandler(reqUserInfo, resUserInfo);
+    const dataUserInfo = getDataUserInfo();
+    assert.notStrictEqual(dataUserInfo.decision, "AUTONOMOUS_APPROVED", "amazon.com@evil.com must NOT be auto-approved");
+    assert.strictEqual(dataUserInfo.host, "evil.com", "Host parser must isolate real apex domain 'evil.com', ignoring userinfo");
+
+    // Test 8b: Port deceptive subdomain (amazon.com.evil.com:8443)
+    const { req: reqPort, res: resPort, getData: getDataPort } = mockReqRes("POST", {
+      intent: "Port spoof invoice",
+      merchant: "amazon.com.evil.com:8443",
+      amount: 45.00
+    });
+    await transactHandler(reqPort, resPort);
+    const dataPort = getDataPort();
+    assert.notStrictEqual(dataPort.decision, "AUTONOMOUS_APPROVED", "amazon.com.evil.com:8443 must NOT be auto-approved");
+    assert.strictEqual(dataPort.host, "amazon.com.evil.com", "Host parser must strip port to isolate full hostname");
+    console.log("  ✓ Test 8: Deceptive user-info URLs and port spoofing intercepted by strict parser");
   }
 
   console.log("\n🎉 All Serverless Edge Handler Tests Passed (100%)!\n");

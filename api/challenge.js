@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 
 const CHALLENGE_SECRET = process.env.PAYGUARD_SECRET || "payguard-stateless-hmac-secret-v1";
+const consumedChallenges = new Set();
 
 function signChallenge(data) {
   const hmac = crypto.createHmac('sha256', CHALLENGE_SECRET);
@@ -47,11 +48,19 @@ module.exports = async (req, res) => {
       if (!verified) {
         return res.status(403).json({ error: "Cryptographic challenge token invalid or expired" });
       }
-      // Cryptographically bind parameters directly from HMAC payload
+
       chalId = verified.challenge_id || chalId;
       amount = verified.amount;
       merchant = verified.merchant;
       currency = verified.currency || "USD";
+
+      // Application-level One-Time Consumption / Replay Defense
+      if (consumedChallenges.has(chalId)) {
+        return res.status(409).json({
+          error: "REPLAY_ATTACK_PREVENTED",
+          message: `Challenge token '${chalId}' has already been consumed and cannot be reused.`
+        });
+      }
 
       // Optional OTP check against hash stored in HMAC payload
       if (otp_code && verified.otp_hash) {
@@ -60,7 +69,17 @@ module.exports = async (req, res) => {
           return res.status(403).json({ error: "Invalid 2FA OTP code. Verification failed." });
         }
       }
+    } else {
+      if (consumedChallenges.has(chalId)) {
+        return res.status(409).json({
+          error: "REPLAY_ATTACK_PREVENTED",
+          message: `Challenge '${chalId}' has already been consumed.`
+        });
+      }
     }
+
+    // Mark as consumed immediately
+    consumedChallenges.add(chalId);
 
     if (!approved) {
       return res.status(200).json({
