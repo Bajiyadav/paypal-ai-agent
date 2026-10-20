@@ -36,8 +36,8 @@ agent = PayGuardAgent()
 # Request/Response Schemas
 class TransactRequest(BaseModel):
     intent: str = Field(..., description="User instruction, e.g., 'Pay monthly AWS server bill'")
-    merchant: str = Field(..., description="Target vendor, e.g., 'aws.amazon.com'")
-    amount: float = Field(..., gt=0, description="Amount in USD")
+    merchant: Optional[str] = Field(None, description="Target vendor, e.g., 'aws.amazon.com'")
+    amount: Optional[float] = Field(None, description="Amount in USD")
     currency: Optional[str] = Field("USD", description="Currency code (USD, EUR, etc.)")
     idempotency_key: Optional[str] = Field(None, description="Optional unique request key for replay defense")
 

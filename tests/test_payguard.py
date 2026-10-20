@@ -1,23 +1,24 @@
 """
 Unit & Adversarial Testing Suite for PayGuard AI
 Tests the explainable risk engine, outer prompt-injection defense,
-spending guardrails, Human-in-the-Loop (HITL) 2FA, and PayPal order lifecycle.
+strict parsed-hostname merchant verification, typosquatting detection,
+amount validation, cumulative spending caps, HITL 2FA, and PayPal lifecycle.
 """
 
 import pytest
 from fastapi.testclient import TestClient
 from backend.main import app
-from backend.agent import PayGuardAgent
+from backend.agent import PayGuardAgent, extract_host, match_verified_merchant, detect_typosquatting
 from backend.paypal_client import PayPalClient
 
 client = TestClient(app)
 
 class TestRiskAndAdversarialEngine:
     def setup_method(self):
-        self.agent = PayGuardAgent(spending_limit=250.00)
+        self.agent = PayGuardAgent(spending_limit=250.00, cumulative_cap=1000.00)
 
-    def test_verified_merchant_is_low_risk(self):
-        """Verified merchants should have low risk and get autonomous approval if under limit."""
+    def test_real_merchant_approved(self):
+        """Authentic verified merchants under limit should get autonomous approval."""
         eval_res = self.agent.evaluate_risk(
             merchant="aws.amazon.com",
             amount=45.00,
@@ -25,29 +26,71 @@ class TestRiskAndAdversarialEngine:
         )
         assert eval_res["risk_score"] <= 25
         assert eval_res["decision"] == "AUTONOMOUS_APPROVED"
-        assert "breakdown" in eval_res
         assert eval_res["breakdown"]["merchant_reputation"] == -5
 
-    def test_phishing_keyword_is_blocked(self):
-        """Suspicious phishing keywords should be flagged as fraud and blocked."""
+    def test_spoofed_subdomain_not_verified(self):
+        """
+        Critical Security Test:
+        Attacker uses spoofed subdomain 'amazon.com.evil.xyz' containing 'amazon.com'.
+        The strict hostname matcher MUST evaluate the real apex domain 'evil.xyz'
+        and flag it as unverified & suspicious TLD.
+        """
         eval_res = self.agent.evaluate_risk(
-            merchant="free-crypto-store.xyz",
-            amount=50.00,
-            description="Buy cheap luxury giftcards"
+            merchant="amazon.com.evil.xyz",
+            amount=45.00,
+            description="Phishing invoice masquerading as Amazon"
         )
-        assert eval_res["risk_score"] >= 70
-        assert eval_res["decision"] == "BLOCKED_FRAUD_DETECTED"
-        assert eval_res["breakdown"]["keyword_screening"] > 0
+        assert eval_res["decision"] != "AUTONOMOUS_APPROVED"
+        assert eval_res["breakdown"]["merchant_reputation"] == 30
+        assert eval_res["breakdown"]["tld_reputation"] == 35
 
-    def test_amount_exceeding_limit_requires_confirmation(self):
-        """Transactions exceeding user spending limit must require human 2FA confirmation."""
+    def test_empty_merchant_not_verified(self):
+        """Empty or malformed merchant string must never match verified whitelist."""
         eval_res = self.agent.evaluate_risk(
-            merchant="amazon.com",
+            merchant="",
+            amount=45.00,
+            description="Empty vendor"
+        )
+        assert eval_res["decision"] != "AUTONOMOUS_APPROVED"
+
+    def test_punycode_homograph_spoofing_rejected(self):
+        """Punycode / IDN homograph domain attacks (xn--) must not match verified whitelist."""
+        eval_res = self.agent.evaluate_risk(
+            merchant="xn--amazn-rqa.com",
+            amount=40.00,
+            description="Homograph attack"
+        )
+        assert eval_res["decision"] != "AUTONOMOUS_APPROVED"
+
+    def test_typosquatting_detection(self):
+        """Visual character substitutions like 'paypa1.com' or 'arnazon.com' must be caught."""
+        eval_res = self.agent.evaluate_risk(
+            merchant="paypa1.com",
+            amount=50.00,
+            description="Typosquatting clone"
+        )
+        assert eval_res["decision"] == "BLOCKED_FRAUD_DETECTED"
+        assert eval_res["breakdown"]["typosquatting_penalty"] == 45
+        assert any("TYPOSQUATTING" in flag for flag in eval_res["flags"])
+
+    def test_negative_or_zero_amount_rejected(self):
+        """Non-positive amounts must be blocked immediately."""
+        neg_res = self.agent.evaluate_risk("github.com", -50.00, "Refund trick")
+        assert neg_res["decision"] == "BLOCKED_INVALID_AMOUNT"
+        assert neg_res["risk_score"] == 100
+
+        zero_res = self.agent.evaluate_risk("github.com", 0.00, "Zero amount")
+        assert zero_res["decision"] == "BLOCKED_INVALID_AMOUNT"
+
+    def test_over_limit_needs_human(self):
+        """Legitimate verified merchant exceeding spending cap requires human 2FA."""
+        eval_res = self.agent.evaluate_risk(
+            merchant="aws.amazon.com",
             amount=500.00,
-            description="Buy new monitor"
+            description="Large cloud bill"
         )
         assert eval_res["decision"] == "REQUIRES_HUMAN_CONFIRMATION"
-        assert eval_res["breakdown"]["spending_limit_penalty"] > 0
+        assert eval_res["breakdown"]["spending_limit_penalty"] == 35
 
     def test_prompt_injection_is_blocked_cold(self):
         """
@@ -64,15 +107,16 @@ class TestRiskAndAdversarialEngine:
         assert eval_res["breakdown"]["adversarial_penalty"] == 75
         assert any("PROMPT_INJECTION" in flag for flag in eval_res["flags"])
 
-    def test_high_risk_tld_penalized(self):
-        """Domains with suspicious TLDs like .xyz receive immediate risk penalty."""
+    def test_cumulative_session_cap(self):
+        """Cumulative spending tracker must prevent balance draining via micro-transactions."""
+        self.agent.cumulative_spent_usd = 980.00 # $980 spent of $1000 cap
         eval_res = self.agent.evaluate_risk(
-            merchant="discount-server.xyz",
-            amount=40.00,
-            description="Monthly cloud storage"
+            merchant="github.com",
+            amount=50.00, # 980 + 50 = 1030 > 1000
+            description="Team seats"
         )
-        assert eval_res["breakdown"]["tld_reputation"] == 35
-        assert any("SUSPICIOUS_TLD" in flag for flag in eval_res["flags"])
+        assert eval_res["decision"] == "REQUIRES_HUMAN_CONFIRMATION"
+        assert eval_res["breakdown"]["cumulative_cap_penalty"] == 40
 
 
 class TestFastAPIEndpointsAndHITL:
@@ -120,7 +164,6 @@ class TestFastAPIEndpointsAndHITL:
         3. User approves via /api/challenge/action.
         4. PayPal Sandbox order is successfully executed.
         """
-        # Step 1: Submit transaction that exceeds limit
         payload = {
             "intent": "Purchase office server hardware",
             "merchant": "dell.com",
@@ -134,7 +177,6 @@ class TestFastAPIEndpointsAndHITL:
         assert tx_data["challenge"] is not None
         challenge_id = tx_data["challenge"]["challenge_id"]
 
-        # Step 2: Approve challenge
         appr_res = client.post("/api/challenge/action", json={
             "challenge_id": challenge_id,
             "approved": True
