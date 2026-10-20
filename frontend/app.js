@@ -131,19 +131,25 @@ async function submitChallengeDecision(approved) {
   rejectBtn.disabled = true;
 
   try {
+    const payloadBody = {
+      challenge_id: challengeId,
+      challenge_token: currentActiveChallenge.challenge_token || null,
+      approved: approved
+    };
+
     // Try FastAPI endpoint first, fallback to Vercel body
     let res = await fetch(`${API_BASE}/api/challenge/action`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ challenge_id: challengeId, approved: approved })
+      body: JSON.stringify(payloadBody)
     });
 
     if (!res.ok) {
-      // Fallback for Vercel serverless
-      res = await fetch(`${API_BASE}/api/transact`, {
+      // Fallback for Vercel serverless /api/challenge
+      res = await fetch(`${API_BASE}/api/challenge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "resolve_challenge", challenge_id: challengeId, approved: approved })
+        body: JSON.stringify(payloadBody)
       });
     }
 

@@ -51,3 +51,7 @@ jobs:
           node -c api/transactions.js
           node -c api/challenge.js
           node -c api/capture.js
+
+      - name: 🧪 Execute Serverless Edge Security & Adversarial Tests
+        run: |
+          node tests/test_serverless.js
