@@ -1,0 +1,51 @@
+name: PayGuard AI CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: 🧪 Run Backend Tests & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Check out repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: 🧪 Execute Unit & Integration Tests
+        run: |
+          pytest tests/ -v
+
+  node-check:
+    name: ⚡ Validate Serverless API Handlers
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Check out repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 🔍 Syntax check serverless endpoints
+        run: |
+          node -c api/health.js
+          node -c api/chat.js
+          node -c api/transact.js
+          node -c api/transactions.js
