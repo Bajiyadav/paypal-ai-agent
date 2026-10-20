@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PayGuard AI | Autonomous Agentic Commerce & Fraud Shield</title>
-  <meta name="description" content="Autonomous AI Agent executing secure PayPal Sandbox payments with real-time fraud guardrails and Gemini intelligence.">
+  <meta name="description" content="Autonomous AI Agent executing secure PayPal Sandbox payments with real-time fraud guardrails, prompt-injection defense, and Gemini intelligence.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -18,7 +18,7 @@
       <div class="brand-icon">🛡️💳</div>
       <div>
         <h1 class="brand-title">PayGuard <span>AI</span></h1>
-        <p class="brand-subtitle">Autonomous Agentic Commerce • PayPal Sandbox</p>
+        <p class="brand-subtitle">Autonomous Agentic Commerce • PayPal Sandbox & Security Shield</p>
       </div>
     </div>
 
@@ -44,14 +44,14 @@
       <!-- Autonomous Quick Simulators -->
       <section class="card">
         <h2 class="card-title">⚡ Quick Agent Scenarios</h2>
-        <p class="card-desc">Simulate autonomous agentic purchases to test fraud guardrails:</p>
+        <p class="card-desc">Simulate autonomous agentic purchases to test guardrails & defense:</p>
         
         <div class="preset-buttons">
           <button class="preset-btn safe" onclick="loadScenario('aws')">
             <span class="preset-icon">☁️</span>
             <div>
               <strong>Pay AWS Cloud Bill</strong>
-              <small>aws.amazon.com • $45.00 (Safe)</small>
+              <small>aws.amazon.com • $45.00 (Autonomous Approved)</small>
             </div>
           </button>
 
@@ -59,15 +59,23 @@
             <span class="preset-icon">🚆</span>
             <div>
               <strong>Book Train Ticket</strong>
-              <small>irctc.co.in • $32.50 (Safe)</small>
+              <small>irctc.co.in • $32.50 (Autonomous Approved)</small>
             </div>
           </button>
 
-          <button class="preset-btn warning" onclick="loadScenario('laptop')">
-            <span class="preset-icon">💻</span>
+          <button class="preset-btn warning" onclick="loadScenario('hitl')">
+            <span class="preset-icon">🔐</span>
             <div>
-              <strong>Buy Dev Laptop</strong>
-              <small>apple.com • $899.00 (Over Limit)</small>
+              <strong>Medium Risk / Cap Exceeded</strong>
+              <small>dell.com • $320.00 (Triggers HITL 2FA)</small>
+            </div>
+          </button>
+
+          <button class="preset-btn danger" onclick="loadScenario('injection')">
+            <span class="preset-icon">🛑</span>
+            <div>
+              <strong>Prompt Injection Attack</strong>
+              <small>invoicing.xyz • $9,500 (Outer Shield Block)</small>
             </div>
           </button>
 
@@ -75,7 +83,7 @@
             <span class="preset-icon">🚨</span>
             <div>
               <strong>Shady Crypto Giftcards</strong>
-              <small>free-crypto-store.xyz • $500.00 (Fraud)</small>
+              <small>free-crypto-store.xyz • $500.00 (Fraud Block)</small>
             </div>
           </button>
         </div>
@@ -136,7 +144,7 @@
           <span class="metric-value text-success" id="metric-approved">0</span>
         </div>
         <div class="metric-card">
-          <span class="metric-label">Fraud Attempts Blocked</span>
+          <span class="metric-label">Attacks / Fraud Blocked</span>
           <span class="metric-value text-danger" id="metric-blocked">0</span>
         </div>
         <div class="metric-card">
@@ -148,7 +156,7 @@
       <!-- Live Transaction Feed -->
       <div class="card feed-card">
         <div class="card-header-flex">
-          <h2 class="card-title">📡 Live Agentic Transaction Feed</h2>
+          <h2 class="card-title">📡 Live Agentic Transaction Feed & Explainable Risk Audit</h2>
           <button class="text-btn" onclick="fetchTransactions()">🔄 Refresh</button>
         </div>
         
@@ -187,14 +195,15 @@
 
         <div class="chat-messages" id="chat-messages">
           <div class="chat-bubble agent">
-            Hello! I am **PayGuard AI**. I can verify merchant credibility, check spending guardrails, and execute automated orders via the PayPal Sandbox. How can I help you today?
+            Hello! I am **PayGuard AI**. I feature deterministic outer prompt-injection defense, explainable risk scoring, and automated PayPal Sandbox execution. How can I help you today?
           </div>
         </div>
 
         <!-- Quick Questions Chips -->
         <div class="prompt-chips">
           <button class="chip" onclick="askCopilot('What is my current spending limit?')">Spending Limit?</button>
-          <button class="chip" onclick="askCopilot('How does PayGuard calculate fraud risk?')">How does fraud risk work?</button>
+          <button class="chip" onclick="askCopilot('How does PayGuard defend against prompt injection?')">Prompt Injection?</button>
+          <button class="chip" onclick="askCopilot('How does explainable risk scoring work?')">Explainable Risk?</button>
           <button class="chip" onclick="askCopilot('Which PayPal APIs are integrated?')">PayPal APIs used?</button>
         </div>
 
@@ -207,6 +216,30 @@
     </aside>
 
   </main>
+
+  <!-- Human-in-the-Loop 2FA Challenge Modal -->
+  <div id="challenge-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-badge">🔐 HUMAN-IN-THE-LOOP 2FA</span>
+        <h3 id="modal-title">Authorize Commercial Transaction</h3>
+      </div>
+      <p class="modal-desc">This transaction reached a medium risk threshold or exceeded your autonomous spending cap. Please review the explainable risk points before releasing funds:</p>
+      
+      <div class="modal-summary" id="modal-summary">
+        <!-- Injected via JavaScript -->
+      </div>
+
+      <div class="modal-actions">
+        <button class="modal-btn approve" id="modal-approve-btn" onclick="submitChallengeDecision(true)">
+          ✅ Approve & Execute PayPal Order
+        </button>
+        <button class="modal-btn reject" id="modal-reject-btn" onclick="submitChallengeDecision(false)">
+          ❌ Reject & Halt Transaction
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

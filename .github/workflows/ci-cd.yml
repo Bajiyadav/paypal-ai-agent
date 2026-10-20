@@ -49,3 +49,5 @@ jobs:
           node -c api/chat.js
           node -c api/transact.js
           node -c api/transactions.js
+          node -c api/challenge.js
+          node -c api/capture.js
