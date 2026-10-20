@@ -15,6 +15,7 @@ const VERIFIED_MERCHANTS = {
   "swiggy.com": { trust_score: 94, category: "Food Delivery" },
   "irctc.co.in": { trust_score: 96, category: "Travel/Railways" },
   "apple.com": { trust_score: 99, category: "Hardware" },
+  "dell.com": { trust_score: 98, category: "Enterprise Hardware" },
   "netflix.com": { trust_score: 97, category: "Entertainment" }
 };
 
@@ -46,7 +47,8 @@ function extractHost(merchant) {
 
 function matchVerifiedMerchant(host) {
   if (!host || host.includes("xn--")) return null;
-  for (const [k, v] of Object.entries(VERIFIED_MERCHANTS)) {
+  const sorted = Object.entries(VERIFIED_MERCHANTS).sort((a, b) => b[0].length - a[0].length);
+  for (const [k, v] of sorted) {
     if (host === k || host.endsWith("." + k)) return v;
   }
   return null;
@@ -111,47 +113,58 @@ module.exports = async (req, res) => {
     const { intent, merchant, amount, currency, action, challenge_id, challenge_token, approved } = req.body || {};
 
     // Handle Challenge (HITL 2FA) resolution - 100% Stateless & Cryptographically Verified
-    if (action === "resolve_challenge" || challenge_id || challenge_token) {
-      let resolvedPayload = {
-        amount: parseFloat(amount || 0) || 50.0,
-        merchant: merchant || "Verified Vendor",
-        currency: currency || "USD"
-      };
+    if (action === "resolve_challenge" || (challenge_id && approved !== undefined) || (challenge_token && approved !== undefined)) {
+      let resolvedChalId = challenge_id || "CHAL-VERIFIED";
+      let resolvedAmount = parseFloat(amount || 0) || 50.0;
+      let resolvedMerchant = merchant || "dell.com";
+      let resolvedCurrency = currency || "USD";
 
       if (challenge_token) {
         const verifiedData = verifyChallengeToken(challenge_token);
         if (!verifiedData) {
           return res.status(403).json({ error: "Cryptographic challenge token invalid, tampered, or expired" });
         }
-        resolvedPayload = verifiedData.payload;
+        resolvedChalId = verifiedData.challenge_id || resolvedChalId;
+        resolvedAmount = verifiedData.amount;
+        resolvedMerchant = verifiedData.merchant;
+        resolvedCurrency = verifiedData.currency || "USD";
+
+        if (req.body.otp_code && verifiedData.otp_hash) {
+          const submittedHash = crypto.createHash('sha256').update(req.body.otp_code.toString().trim()).digest('hex');
+          if (submittedHash !== verifiedData.otp_hash) {
+            return res.status(403).json({ error: "Invalid 2FA OTP code. Verification failed." });
+          }
+        }
       }
 
       if (!approved) {
         return res.status(200).json({
           status: "rejected",
-          challenge_id: challenge_id || "CHAL-VERIFIED",
+          challenge_id: resolvedChalId,
           message: "Transaction rejected by user. No funds moved."
         });
       }
 
+      const idempotencyKey = `payguard-req-chal-${resolvedChalId}`;
       const orderId = "SANDBOX-ORD-" + Math.floor(100000 + Math.random() * 900000);
       const executedOrder = {
         id: orderId,
         status: "CREATED",
-        amount: Number(resolvedPayload.amount).toFixed(2),
-        currency: resolvedPayload.currency || "USD",
-        merchant: resolvedPayload.merchant,
+        amount: Number(resolvedAmount).toFixed(2),
+        currency: resolvedCurrency,
+        merchant: resolvedMerchant,
         approval_url: `https://www.sandbox.paypal.com/checkoutnow?token=${orderId}`,
         latency_ms: 38.5,
         mode: "PAYPAL_SANDBOX_REST_V2",
-        idempotency_key: "req-" + Math.random().toString(36).substring(7)
+        idempotency_key: idempotencyKey,
+        paypal_request_id: idempotencyKey
       };
 
-      cumulativeSpent += Number(resolvedPayload.amount);
+      cumulativeSpent += Number(resolvedAmount);
 
       return res.status(200).json({
         status: "approved",
-        challenge_id: challenge_id || "CHAL-VERIFIED",
+        challenge_id: resolvedChalId,
         message: "Human 2FA authorization confirmed. PayPal Sandbox order executed.",
         order: executedOrder
       });
@@ -277,12 +290,16 @@ module.exports = async (req, res) => {
       decision = "REQUIRES_HUMAN_CONFIRMATION";
       const chalId = "CHAL-" + Math.floor(100000 + Math.random() * 900000);
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpHash = crypto.createHash('sha256').update(otpCode).digest('hex');
       
-      // Stateless HMAC-signed challenge token
+      // Stateless HMAC-signed challenge token binding all transaction parameters
       const challengeData = {
         challenge_id: chalId,
-        otp_code: otpCode,
-        payload: { intent, merchant, amount: amt, currency: currency || "USD" },
+        otp_hash: otpHash,
+        merchant: merchant,
+        amount: amt,
+        currency: currency || "USD",
+        intent: intent || "Commercial payment",
         created_at: Date.now(),
         expires_at: Date.now() + 300000 // 5 min
       };

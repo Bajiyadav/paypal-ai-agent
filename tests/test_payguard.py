@@ -18,7 +18,7 @@ class TestRiskAndAdversarialEngine:
         self.agent = PayGuardAgent(spending_limit=250.00, cumulative_cap=1000.00)
 
     def test_real_merchant_approved(self):
-        """Authentic verified merchants under limit should get autonomous approval."""
+        """Authentic verified merchants under limit should get autonomous approval with longest-prefix specificity."""
         eval_res = self.agent.evaluate_risk(
             merchant="aws.amazon.com",
             amount=45.00,
@@ -27,6 +27,9 @@ class TestRiskAndAdversarialEngine:
         assert eval_res["risk_score"] <= 25
         assert eval_res["decision"] == "AUTONOMOUS_APPROVED"
         assert eval_res["breakdown"]["merchant_reputation"] == -5
+        # Ensure longest/most specific domain matched (aws.amazon.com -> Cloud Infrastructure 99), not amazon.com (Retail 98)
+        assert any("Cloud Infrastructure" in f and "99/100" in f for f in eval_res["flags"])
+        assert not any("Retail" in f for f in eval_res["flags"])
 
     def test_spoofed_subdomain_not_verified(self):
         """

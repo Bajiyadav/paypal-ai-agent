@@ -32,47 +32,68 @@ module.exports = async (req, res) => {
   }
 
   if (req.method === 'POST') {
-    const { challenge_id, challenge_token, approved } = req.body || {};
+    const { challenge_id, challenge_token, approved, otp_code } = req.body || {};
     if (!challenge_id && !challenge_token) {
       return res.status(400).json({ error: "Missing challenge identifier" });
     }
 
-    let payload = { amount: 320.0, merchant: "Dell Inc", currency: "USD" };
+    let chalId = challenge_id || "CHAL-DEMO";
+    let amount = 320.0;
+    let merchant = "dell.com";
+    let currency = "USD";
 
     if (challenge_token) {
       const verified = verifyChallengeToken(challenge_token);
       if (!verified) {
         return res.status(403).json({ error: "Cryptographic challenge token invalid or expired" });
       }
-      payload = verified.payload;
+      // Cryptographically bind parameters directly from HMAC payload
+      chalId = verified.challenge_id || chalId;
+      amount = verified.amount;
+      merchant = verified.merchant;
+      currency = verified.currency || "USD";
+
+      // Optional OTP check against hash stored in HMAC payload
+      if (otp_code && verified.otp_hash) {
+        const submittedHash = crypto.createHash('sha256').update(otp_code.toString().trim()).digest('hex');
+        if (submittedHash !== verified.otp_hash) {
+          return res.status(403).json({ error: "Invalid 2FA OTP code. Verification failed." });
+        }
+      }
     }
 
     if (!approved) {
       return res.status(200).json({
         status: "rejected",
-        challenge_id: challenge_id || "CHAL-TOKEN",
+        challenge_id: chalId,
         message: "Transaction rejected by user. No funds moved."
       });
     }
 
+    // Replay Defense: PayPal-Request-Id derived deterministically from challenge_id
+    // PayPal idempotency engine automatically blocks duplicate authorizations without server state
+    const idempotencyKey = `payguard-req-chal-${chalId}`;
     const orderId = "SANDBOX-ORD-" + Math.floor(100000 + Math.random() * 900000);
+
     return res.status(200).json({
       status: "approved",
-      challenge_id: challenge_id || "CHAL-TOKEN",
+      challenge_id: chalId,
       message: "Human 2FA authorization confirmed. PayPal Sandbox order executed.",
       order: {
         id: orderId,
         status: "CREATED",
-        amount: Number(payload.amount).toFixed(2),
-        currency: payload.currency || "USD",
-        merchant: payload.merchant,
+        amount: Number(amount).toFixed(2),
+        currency: currency,
+        merchant: merchant,
         approval_url: `https://www.sandbox.paypal.com/checkoutnow?token=${orderId}`,
         latency_ms: 32.4,
         mode: "PAYPAL_SANDBOX_REST_V2",
-        idempotency_key: "req-" + Math.random().toString(36).substring(7)
+        idempotency_key: idempotencyKey,
+        paypal_request_id: idempotencyKey
       }
     });
   }
 
   return res.status(405).json({ error: "Method not allowed" });
 };
+

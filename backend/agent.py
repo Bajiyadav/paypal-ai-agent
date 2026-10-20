@@ -31,6 +31,7 @@ VERIFIED_MERCHANTS = {
     "swiggy.com": {"trust_score": 94, "category": "Food Delivery", "verified": True},
     "irctc.co.in": {"trust_score": 96, "category": "Travel/Railways", "verified": True},
     "apple.com": {"trust_score": 99, "category": "Hardware", "verified": True},
+    "dell.com": {"trust_score": 98, "category": "Enterprise Hardware", "verified": True},
     "netflix.com": {"trust_score": 97, "category": "Entertainment", "verified": True}
 }
 
@@ -74,12 +75,14 @@ def extract_host(merchant: str) -> str:
 def match_verified_merchant(host: str) -> Optional[Dict[str, Any]]:
     """
     Strict hostname matching against verified enterprise whitelist.
+    Matches most specific domain first (e.g. 'aws.amazon.com' before 'amazon.com').
     Prevents sub-domain spoofing attacks (e.g. 'amazon.com.evil.xyz')
     and homograph/punycode spoofing (e.g. 'xn--...').
     """
     if not host or "xn--" in host or not host.isascii():
         return None
-    for domain, info in VERIFIED_MERCHANTS.items():
+    sorted_merchants = sorted(VERIFIED_MERCHANTS.items(), key=lambda x: len(x[0]), reverse=True)
+    for domain, info in sorted_merchants:
         # Exact match or authentic sub-domain of verified root (e.g. 'aws.amazon.com')
         if host == domain or host.endswith("." + domain):
             return info
